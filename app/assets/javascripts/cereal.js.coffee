@@ -2,8 +2,6 @@
 #   inheritance w/ and w/o coffeescript
 #   not attempting to use constructors for 'primative' types
 #
-report = (message) ->
-  throw new Error "You're slouching: #{message} :("
 
 with_each_attr = (thing, fn) ->
   if _.isObject(thing)
@@ -12,6 +10,7 @@ with_each_attr = (thing, fn) ->
     fn thing
 
 # Aggregate defaults up the prototype chain in `snapshot`
+# TODO: this is now used in three separate projects!
 aggregate_defaults = (current) ->
   defaults = {}
   while current?.defaults
@@ -20,23 +19,7 @@ aggregate_defaults = (current) ->
   defaults 
 
   
-window.Slouch =
-  attributeKeys: () ->
-    snapshot = aggregate_defaults this
-
-    # Bind reference to original methods in outer scope.
-    _get = @get
-    _set = @set
-
-    @get = (key, options...) ->
-      unless key of snapshot
-        report "Attempting to `get()` with unknown key '#{key}'."
-      _get.call this, key, options...
-    @set = (arg1, options...) ->
-      with_each_attr arg1, (key) ->
-        unless key of snapshot
-          report "Attempting to `set()` with unknown key '#{arg1}'."
-      _set.call this, arg1, options...
+window.Cereal =
 
   isPrimative: (val) ->
     _.isArray(val) or
@@ -49,11 +32,12 @@ window.Slouch =
       _.isRegExp(val)
 
 
-  attributeTypes: () ->
+  mixInDeserializers: ->
     snapshot = aggregate_defaults this
 
     _set = @set
     @set = (arg1, options...) ->
+      # TODO: a lot of this code is duplicated in Backbone.Slouch
       deserializers = @deserializers or []
       with_each_attr arg1, (key, associated_value) ->
         ref = snapshot[arg1]
@@ -66,19 +50,15 @@ window.Slouch =
               arg1[key] = new_value
             else
               options[0] = new_value
-          else if ref.constructor? and not Slouch.isPrimative(ref) and Slouch.isPrimative(value)
+          else if ref.constructor? and not Cereal.isPrimative(ref) and Cereal.isPrimative(value)
             new_value = new ref.constructor(value)
             if associated_value?
               arg1[key] = new_value
             else
               options[0] = new_value
-          else
-            report """
-              Attempting to `set()` with value of type
-              '#{value.constructor}' is not allowed for key '#{arg1}'.
-              """
       _set.call this, arg1, options...
 
+  mixInSerializers: ->
     _toJSON = @toJSON
     @toJSON = (args...) ->
       _serializeNestedData = (data) ->
@@ -89,12 +69,12 @@ window.Slouch =
         data
       _serializeNestedData(_toJSON.call(this, args...))
 
-class Slouch.Model extends Backbone.Model
+class Cereal.Model extends Backbone.Model
   constructor: (args...) ->
     super
     fn.apply this, args for fn in [
-        Slouch.attributeKeys
-        Slouch.attributeTypes
+        Cereal.mixInSerializers
+        Cereal.mixInDeserializers
     ]
 
 

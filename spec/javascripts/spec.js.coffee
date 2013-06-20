@@ -2,6 +2,6 @@
 #= require backbone
 #= require jquery
 #= require moment
-#= require slouch
+#= require cereal
 #= require_self
 #= require_tree ./
